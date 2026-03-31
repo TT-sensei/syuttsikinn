@@ -51,13 +51,15 @@
       max-width: 1000px;
       margin: 20px auto;
       padding: 0 20px;
+      padding-bottom: 50px;
     }
 
+    /* ボード画面 */
     #board-view { display: block; }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 15px;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
       margin-top: 20px;
     }
 
@@ -65,19 +67,34 @@
       background-color: var(--btn-off);
       border: none;
       border-radius: 12px;
-      padding: 20px;
-      font-size: 1.2rem;
+      padding: 15px 10px;
+      font-size: 1rem;
       font-weight: bold;
       color: var(--text-main);
       cursor: pointer;
       transition: all 0.2s;
       box-shadow: 0 4px 0px rgba(0,0,0,0.1);
       text-align: center;
+      position: relative;
+      min-height: 80px;
     }
 
     .name-tile:active { transform: translateY(4px); box-shadow: none; }
     .name-tile.status-in { background-color: var(--btn-on); color: white; }
     .name-tile.status-done { background-color: var(--btn-done); color: white; }
+
+    .edit-btn {
+      position: absolute;
+      bottom: 5px;
+      left: 8px;
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      opacity: 0.5;
+      padding: 0;
+    }
+    .edit-btn:hover { opacity: 1; }
 
     .pagination {
       display: flex;
@@ -93,9 +110,12 @@
       color: white;
       border-radius: 8px;
       cursor: pointer;
+      font-weight: bold;
+      font-size: 0.95rem;
     }
     .page-btn:disabled { background-color: #ccc; cursor: not-allowed; }
 
+    /* 管理画面 */
     #admin-view { display: none; }
     table {
       width: 100%;
@@ -104,43 +124,70 @@
       background: white;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    th, td { padding: 12px; border: 1px solid #eee; text-align: center; }
+    th, td { padding: 10px; border: 1px solid #eee; text-align: center; font-size: 0.95rem; }
     th { background-color: #fcece3; }
     .alert-yellow { background-color: var(--alert-yellow); }
     .alert-red { background-color: var(--alert-red); color: white;}
     .status-warning { background-color: var(--alert-light-red); font-weight: bold; color: #d32f2f;} 
     
-    .admin-controls { display: flex; justify-content: space-between; margin-bottom: 15px; }
+    .admin-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .month-picker { padding: 8px; font-size: 1.1rem; border-radius: 8px; border: 1px solid #ccc; }
 
+    /* データ管理エリア */
+    .data-management {
+      margin-top: 40px;
+      padding: 20px;
+      background: #fdf5f1;
+      border-radius: 12px;
+      border: 1px solid #f7ceba;
+    }
+    .data-management h3 { margin-top: 0; color: var(--text-main); font-size: 1.2rem;}
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;}
+    .file-label {
+      display: inline-block;
+      cursor: pointer;
+      text-align: center;
+    }
+    .btn-dark { background-color: #5a4a42; }
+
+    /* モーダル */
     .modal-overlay {
       display: none;
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0,0,0,0.5);
       justify-content: center;
       align-items: center;
       z-index: 1000;
     }
     .modal-content {
       background: white;
-      padding: 30px;
+      padding: 25px;
       border-radius: 16px;
       text-align: center;
-      max-width: 400px;
+      width: 90%;
+      max-width: 350px;
       box-shadow: 0 10px 20px rgba(0,0,0,0.2);
     }
-    .modal-content h2 { color: var(--primary-color); margin-top: 0; }
-    .modal-content p { font-size: 1.1rem; line-height: 1.5; }
+    .modal-content h2 { color: var(--primary-color); margin-top: 0; font-size: 1.3rem;}
     .modal-btn {
-      margin-top: 20px;
-      padding: 10px 30px;
+      margin-top: 15px;
+      padding: 10px 20px;
       background: var(--primary-color);
       color: white;
       border: none;
       border-radius: 8px;
       cursor: pointer;
       font-size: 1rem;
+      width: 100%;
+      font-weight: bold;
     }
+    .modal-btn-cancel { background: #ccc; margin-top: 10px; }
+
+    .edit-form { text-align: left; margin-top: 15px; }
+    .edit-form label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem;}
+    .edit-form input { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box;}
+    .time-inputs { display: flex; gap: 10px; }
   </style>
 </head>
 <body>
@@ -165,9 +212,13 @@
     </div>
 
     <div id="admin-view">
-      <h2>📊 今月の集計データ（管理者用）</h2>
+      <h2>📊 集計データ（管理者用）</h2>
       <div class="admin-controls">
-        <button class="page-btn" onclick="exportCSV()">📥 CSVダウンロード</button>
+        <div>
+          <label for="admin-month" style="font-weight: bold;">表示月：</label>
+          <input type="month" id="admin-month" class="month-picker" onchange="renderAdminTable()">
+        </div>
+        <button class="page-btn" onclick="exportSummaryCSV()">📥 月間集計(CSV)</button>
       </div>
       <table id="admin-table">
         <thead>
@@ -176,84 +227,101 @@
             <th>基本勤務時間</th>
             <th>当月総労働時間</th>
             <th>当月残業合計</th>
-            <th>現在の状態</th>
+            <th>本日の状態</th>
           </tr>
         </thead>
         <tbody id="admin-tbody"></tbody>
       </table>
+
+      <div class="data-management">
+        <h3>⚙️ データ入出力・バックアップ</h3>
+        
+        <p style="font-size: 0.9rem; margin-bottom: 5px;"><strong>【CSV操作】</strong> 日別詳細データの出力と、名簿の更新</p>
+        <div class="btn-group">
+          <button class="page-btn" onclick="exportDetailedCSV()">📥 日別詳細ログ(CSV)</button>
+          <label class="page-btn file-label btn-dark">
+            📤 名簿CSVの一括読込
+            <input type="file" accept=".csv" onchange="importTeachersCSV(event)" style="display:none;">
+          </label>
+        </div>
+
+        <p style="font-size: 0.9rem; margin-top: 15px; margin-bottom: 5px;"><strong>【JSON操作】</strong> 別タブレットへの移行・完全バックアップ</p>
+        <div class="btn-group">
+          <button class="page-btn" onclick="exportJSON()">📦 全データ保存(JSON)</button>
+          <label class="page-btn file-label btn-dark">
+            📦 全データ復元(JSON)
+            <input type="file" accept=".json" onchange="importJSON(event)" style="display:none;">
+          </label>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal">
+  <div class="modal-overlay" id="msg-modal">
     <div class="modal-content">
-      <h2 id="modal-title"></h2>
-      <p id="modal-message"></p>
-      <button class="modal-btn" onclick="closeModal()">閉じる</button>
+      <h2 id="msg-modal-title"></h2>
+      <p id="msg-modal-message"></p>
+      <button class="modal-btn" onclick="closeMsgModal()">閉じる</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal-content">
+      <h2>✏️ 先生情報の編集</h2>
+      <div class="edit-form">
+        <input type="hidden" id="edit-id">
+        <label>氏名</label>
+        <input type="text" id="edit-name">
+        <label>打刻データの修正（日付を選択）</label>
+        <input type="date" id="edit-date" onchange="loadDateLogForEdit()">
+        <div class="time-inputs">
+          <div style="flex:1;"><label>出勤</label><input type="time" id="edit-in"></div>
+          <div style="flex:1;"><label>退勤</label><input type="time" id="edit-out"></div>
+        </div>
+      </div>
+      <button class="modal-btn" onclick="saveEdit()">保存する</button>
+      <button class="modal-btn modal-btn-cancel" onclick="closeEditModal()">キャンセル</button>
     </div>
   </div>
 
 <script>
-  const ITEMS_PER_PAGE = 20;
+  const ITEMS_PER_PAGE = 50;
   let currentPage = 1;
-  let teachers = JSON.parse(localStorage.getItem('school_teachers'));
-  
+  let teachers = JSON.parse(localStorage.getItem('app_teachers_v3'));
+  let dailyLogs = JSON.parse(localStorage.getItem('app_logs_v3')) || {};
+
   if (!teachers) {
     teachers = [];
-    const names = ["山田 太郎", "佐藤 花子", "鈴木 一郎", "高橋 結衣", "田中 健太", "伊藤 美咲", "渡辺 翔太", "山本 葵", "中村 蓮", "小林 凛",
-                   "加藤 大輝", "吉田 さくら", "山田 拓哉", "佐々木 結菜", "山口 陽向", "松本 莉子", "井上 蒼空", "木村 結愛", "林 奏太", "斎藤 琴音"];
-    
+    const names = ["山田 太郎", "佐藤 花子", "鈴木 一郎", "高橋 結衣"];
     names.forEach((name, index) => {
-      teachers.push({
-        id: index + 1,
-        name: name,
-        status: "out",
-        standardStart: "08:15",
-        standardEnd: "16:45",
-        monthlyTotalHours: 0,
-        monthlyOvertime: 0,
-        timeIn: null
-      });
+      teachers.push({ id: index + 1, name: name, status: "out", standardStart: "08:15", standardEnd: "16:45", timeIn: null });
     });
     saveData();
   }
 
-  function saveData() {
-    localStorage.setItem('school_teachers', JSON.stringify(teachers));
+  function getTodayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
-  function checkMonthReset() {
-    const now = new Date();
-    const thisMonth = now.getFullYear() + "-" + (now.getMonth() + 1);
-    const savedMonth = localStorage.getItem('current_month');
-
-    if (savedMonth && thisMonth !== savedMonth) {
-      teachers.forEach(t => {
-        t.monthlyTotalHours = 0;
-        t.monthlyOvertime = 0;
-      });
-      saveData();
-    }
-    localStorage.setItem('current_month', thisMonth);
+  function saveData() {
+    localStorage.setItem('app_teachers_v3', JSON.stringify(teachers));
+    localStorage.setItem('app_logs_v3', JSON.stringify(dailyLogs));
   }
 
   function checkDateReset() {
-    const today = new Date().toLocaleDateString();
-    const lastDate = localStorage.getItem('last_used_date');
-
-    if (lastDate && lastDate !== today) {
-      teachers.forEach(t => {
-        if (t.status === "in") {
-          console.warn(`⚠️ ${t.name}先生 が前日退勤打刻なし（強制リセット）`);
-        }
-        t.status = "out";
-        t.timeIn = null;
-      });
+    const todayStr = getTodayStr();
+    const lastDate = localStorage.getItem('last_used_date_v3');
+    if (lastDate && lastDate !== todayStr) {
+      teachers.forEach(t => { t.status = "out"; t.timeIn = null; });
       saveData();
     }
-    localStorage.setItem('last_used_date', today);
+    localStorage.setItem('last_used_date_v3', todayStr);
   }
 
   function timeToMinutes(timeStr) {
+    if (!timeStr) return 0;
     const [h, m] = timeStr.split(":").map(Number);
     return h * 60 + m;
   }
@@ -269,112 +337,138 @@
   function renderBoard() {
     const grid = document.getElementById('teacher-grid');
     grid.innerHTML = '';
-    
-    let displayTeachers = [...teachers].sort((a, b) => {
-      if (a.status === "in" && b.status !== "in") return -1;
-      if (a.status !== "in" && b.status === "in") return 1;
-      return a.id - b.id; 
-    });
-
+    let displayTeachers = [...teachers].sort((a, b) => a.id - b.id);
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const pageTeachers = displayTeachers.slice(start, end);
+    const pageTeachers = displayTeachers.slice(start, start + ITEMS_PER_PAGE);
 
     pageTeachers.forEach(t => {
-      const btn = document.createElement('button');
-      btn.className = `name-tile status-${t.status}`;
+      const tile = document.createElement('div');
+      tile.className = `name-tile status-${t.status}`;
       
       let statusText = "";
-      // 🟡 神機能：打刻時刻のちょい表示
       if (t.status === "in") {
         const time = new Date(t.timeIn);
-        const hh = time.getHours();
-        const mm = time.getMinutes().toString().padStart(2, '0');
-        statusText = `<br><small>${hh}:${mm}〜勤務中</small>`;
+        statusText = `<br><span style="font-size:0.85rem; font-weight:normal;">${time.getHours()}:${time.getMinutes().toString().padStart(2, '0')}〜勤務中</span>`;
       }
-      if (t.status === "done") statusText = "<br><small>退勤済</small>";
+      if (t.status === "done") statusText = `<br><span style="font-size:0.85rem; font-weight:normal;">退勤済</span>`;
       
-      btn.innerHTML = `${t.name} ${statusText}`;
-      btn.onclick = () => handlePunch(t.id);
-      grid.appendChild(btn);
+      const punchArea = document.createElement('div');
+      punchArea.innerHTML = `${t.name} ${statusText}`;
+      punchArea.onclick = () => handlePunch(t.id);
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.innerHTML = '✏️';
+      editBtn.onclick = (e) => { e.stopPropagation(); openEditModal(t.id); };
+
+      tile.appendChild(punchArea);
+      tile.appendChild(editBtn);
+      grid.appendChild(tile);
     });
 
     const totalPages = Math.ceil(teachers.length / ITEMS_PER_PAGE);
-    document.getElementById('page-indicator').innerText = `${currentPage} / ${totalPages}`;
+    document.getElementById('page-indicator').innerText = totalPages > 0 ? `${currentPage} / ${totalPages}` : "1 / 1";
     document.getElementById('prev-btn').disabled = currentPage === 1;
-    document.getElementById('next-btn').disabled = currentPage === totalPages;
+    document.getElementById('next-btn').disabled = currentPage === totalPages || totalPages === 0;
   }
 
-  function changePage(delta) {
-    currentPage += delta;
-    renderBoard();
+  function changePage(delta) { currentPage += delta; renderBoard(); }
+
+  function saveDailyLog(dateStr, teacherId, inTimeStr, outTimeStr) {
+    if (!dailyLogs[dateStr]) dailyLogs[dateStr] = {};
+    const t = teachers.find(x => x.id == teacherId);
+    let workHours = 0, overtime = 0;
+
+    if (inTimeStr && outTimeStr) {
+      const inMin = timeToMinutes(inTimeStr);
+      let outMin = timeToMinutes(outTimeStr);
+      if (outMin < inMin) outMin += 24 * 60; 
+      workHours = (outMin - inMin) / 60;
+      const stdHours = (timeToMinutes(t.standardEnd) - timeToMinutes(t.standardStart)) / 60;
+      overtime = Math.max(0, workHours - stdHours);
+    }
+    dailyLogs[dateStr][teacherId] = { in: inTimeStr, out: outTimeStr, work: workHours, over: overtime };
+  }
+
+  function getHHMM(timestamp) {
+    const d = new Date(timestamp);
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
 
   function handlePunch(id) {
     const teacher = teachers.find(t => t.id === id);
+    const todayStr = getTodayStr();
     
-    // 🔴 現場救済：退勤取り消し機能
     if (teacher.status === "done") {
       if (!confirm(`${teacher.name}先生、退勤を取り消して勤務中に戻しますか？`)) return;
       teacher.status = "in";
-      teacher.timeIn = new Date().getTime(); // 再開時刻として記録
-      saveData();
-      renderBoard();
-      if(isAdmin) renderAdminTable();
-      return;
-    }
-
-    if (teacher.status === "out") {
+      teacher.timeIn = new Date().getTime();
+      saveDailyLog(todayStr, id, getHHMM(teacher.timeIn), "");
+    } else if (teacher.status === "out") {
       teacher.status = "in";
       teacher.timeIn = new Date().getTime();
-      
-      showModal(`${teacher.name}先生、おはようございます！`, "今日も1日よろしくお願いします！");
-
+      saveDailyLog(todayStr, id, getHHMM(teacher.timeIn), "");
+      showMsgModal(`${teacher.name}先生、おはようございます！`, "今日も1日よろしくお願いします！");
     } else if (teacher.status === "in") {
       if (!confirm(`${teacher.name}先生、退勤しますか？`)) return;
-
       teacher.status = "done";
-      const now = new Date();
-
-      // 🔴 超重要バグ修正：getTime() を使った正確な時間計算
-      const workHours = (now.getTime() - teacher.timeIn) / (1000 * 60 * 60);
-
-      const standardStart = timeToMinutes(teacher.standardStart);
-      const standardEnd = timeToMinutes(teacher.standardEnd);
-      const standardHours = (standardEnd - standardStart) / 60;
-
-      const overtime = Math.max(0, workHours - standardHours);
-
-      teacher.monthlyTotalHours += workHours;
-      teacher.monthlyOvertime += overtime;
-
-      let alertTitle = "お疲れ様でした！";
-      let alertMsg = `本日の実働は ${workHours.toFixed(2)} 時間でした。`;
-
-      if (teacher.monthlyOvertime > 45) {
-        alertTitle = "⚠️ 超過警告";
-        alertMsg += `<br><br>今月の残業が <strong style="color:red;">${teacher.monthlyOvertime.toFixed(1)} 時間</strong> です。<br>業務調整を相談してください。`;
-      } else if (teacher.monthlyOvertime > 30) {
-        alertTitle = "💡 注意";
-        alertMsg += `<br><br>今月の残業が <strong>${teacher.monthlyOvertime.toFixed(1)} 時間</strong> です。<br>明日は早く帰りましょう。`;
+      saveDailyLog(todayStr, id, getHHMM(teacher.timeIn), getHHMM(new Date().getTime()));
+      
+      const monthPrefix = todayStr.substring(0, 7);
+      let monthOvertime = 0;
+      for (let d in dailyLogs) {
+        if (d.startsWith(monthPrefix) && dailyLogs[d][id]) monthOvertime += dailyLogs[d][id].over || 0;
       }
 
-      showModal(`${teacher.name}先生、${alertTitle}`, alertMsg);
+      let msg = `本日の実働は ${dailyLogs[todayStr][id].work.toFixed(2)} 時間でした。`;
+      let title = monthOvertime > 45 ? "⚠️ 超過警告" : (monthOvertime > 30 ? "💡 注意" : "お疲れ様でした！");
+      if(monthOvertime > 30) msg += `<br><br>今月の残業が <strong style="color:red;">${monthOvertime.toFixed(1)} 時間</strong> です。`;
+      showMsgModal(`${teacher.name}先生、${title}`, msg);
     }
     
-    saveData();
-    renderBoard();
-    if(isAdmin) renderAdminTable();
+    saveData(); renderBoard(); if(isAdmin) renderAdminTable();
   }
 
-  function showModal(title, message) {
-    document.getElementById('modal-title').innerText = title;
-    document.getElementById('modal-message').innerHTML = message;
-    document.getElementById('modal').style.display = 'flex';
+  function openEditModal(id) {
+    const t = teachers.find(x => x.id === id);
+    document.getElementById('edit-id').value = id;
+    document.getElementById('edit-name').value = t.name;
+    document.getElementById('edit-date').value = getTodayStr();
+    loadDateLogForEdit();
+    document.getElementById('edit-modal').style.display = 'flex';
   }
-  function closeModal() {
-    document.getElementById('modal').style.display = 'none';
+  function closeEditModal() { document.getElementById('edit-modal').style.display = 'none'; }
+  function loadDateLogForEdit() {
+    const id = document.getElementById('edit-id').value;
+    const date = document.getElementById('edit-date').value;
+    const log = (dailyLogs[date] && dailyLogs[date][id]) ? dailyLogs[date][id] : null;
+    document.getElementById('edit-in').value = log ? log.in : "";
+    document.getElementById('edit-out').value = log ? log.out : "";
   }
+  function saveEdit() {
+    const id = parseInt(document.getElementById('edit-id').value);
+    const dateStr = document.getElementById('edit-date').value;
+    const inTime = document.getElementById('edit-in').value;
+    const outTime = document.getElementById('edit-out').value;
+    
+    const teacher = teachers.find(t => t.id === id);
+    teacher.name = document.getElementById('edit-name').value.trim();
+    saveDailyLog(dateStr, id, inTime, outTime);
+
+    if (dateStr === getTodayStr()) {
+      if (inTime && !outTime) { teacher.status = "in"; teacher.timeIn = new Date(`${dateStr}T${inTime}:00`).getTime(); } 
+      else if (inTime && outTime) { teacher.status = "done"; } 
+      else { teacher.status = "out"; teacher.timeIn = null; }
+    }
+    saveData(); renderBoard(); if(isAdmin) renderAdminTable(); closeEditModal();
+  }
+
+  function showMsgModal(title, message) {
+    document.getElementById('msg-modal-title').innerText = title;
+    document.getElementById('msg-modal-message').innerHTML = message;
+    document.getElementById('msg-modal').style.display = 'flex';
+  }
+  function closeMsgModal() { document.getElementById('msg-modal').style.display = 'none'; }
 
   let isAdmin = false;
   function toggleView() {
@@ -382,66 +476,176 @@
     document.getElementById('board-view').style.display = isAdmin ? 'none' : 'block';
     document.getElementById('admin-view').style.display = isAdmin ? 'block' : 'none';
     document.querySelector('.nav-btn').innerText = isAdmin ? '打刻画面に戻る' : '管理画面へ切り替え';
-    if(isAdmin) renderAdminTable();
+    if (isAdmin) {
+      document.getElementById('admin-month').value = getTodayStr().substring(0, 7);
+      renderAdminTable();
+    }
   }
 
   function renderAdminTable() {
     const tbody = document.getElementById('admin-tbody');
     tbody.innerHTML = '';
+    const targetMonth = document.getElementById('admin-month').value;
+    if (!targetMonth) return;
 
-    const adminTeachers = [...teachers].sort((a, b) => a.id - b.id);
-
-    adminTeachers.forEach(t => {
-      const tr = document.createElement('tr');
+    [...teachers].sort((a, b) => a.id - b.id).forEach(t => {
+      let mTotal = 0, mOver = 0;
+      for (let d in dailyLogs) {
+        if (d.startsWith(targetMonth) && dailyLogs[d][t.id]) {
+          mTotal += dailyLogs[d][t.id].work || 0;
+          mOver += dailyLogs[d][t.id].over || 0;
+        }
+      }
       
-      let statusHtml = "<td>🟢 正常</td>";
-      let stateText = t.status === "in" ? "勤務中" : (t.status === "done" ? "退勤済" : "未出勤");
-      let stateHtml = `<td>${stateText}</td>`;
+      let state = t.status === "in" ? "⚠️未退勤" : (t.status === "done" ? "退勤済" : "未出勤");
+      let trClass = mOver > 45 ? "alert-red" : (mOver > 30 ? "alert-yellow" : "");
+      if(t.status === "in") trClass = "status-warning";
 
-      if (t.monthlyOvertime > 45) {
-        tr.className = "alert-red";
-        statusHtml = "<td>🔴 危険 (45h超過)</td>";
-      } else if (t.monthlyOvertime > 30) {
-        tr.className = "alert-yellow";
-        statusHtml = "<td>🟡 注意 (30h超過)</td>";
-      }
-
-      if (t.status === "in") {
-        tr.classList.add("status-warning");
-        stateHtml = `<td>⚠️ 未退勤</td>`;
-      }
-
-      tr.innerHTML = `
-        <td>${t.name}</td>
-        <td>${t.standardStart}〜${t.standardEnd}</td>
-        <td>${t.monthlyTotalHours.toFixed(2)} h</td>
-        <td>${t.monthlyOvertime.toFixed(2)} h</td>
-        ${stateHtml}
+      tbody.innerHTML += `
+        <tr class="${trClass}">
+          <td>${t.name}</td>
+          <td>${t.standardStart}〜${t.standardEnd}</td>
+          <td>${mTotal.toFixed(2)} h</td>
+          <td>${mOver.toFixed(2)} h</td>
+          <td>${state}</td>
+        </tr>
       `;
-      tbody.appendChild(tr);
     });
   }
 
-  function exportCSV() {
-    let csvContent = "氏名,基本勤務開始,基本勤務終了,当月総労働時間,当月残業合計\n";
-    
-    const exportTeachers = [...teachers].sort((a, b) => a.id - b.id);
-    exportTeachers.forEach(t => {
-      csvContent += `${t.name},${t.standardStart},${t.standardEnd},${t.monthlyTotalHours.toFixed(2)},${t.monthlyOvertime.toFixed(2)}\n`;
-    });
+  // ==========================================
+  // 新機能：データ入出力 (CSV / JSON)
+  // ==========================================
 
-    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+  // 1. ダウンロード用ヘルパー関数
+  function downloadFile(content, fileName, mimeType) {
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), content], { type: mimeType }); // BOM付きで文字化け防止
     const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `attendance_${new Date().getFullYear()}_${new Date().getMonth()+1}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
     link.click();
-    document.body.removeChild(link);
   }
 
-  checkMonthReset(); 
+  // 2. CSV出力：月間集計（既存のものをヘルパー利用に整理）
+  function exportSummaryCSV() {
+    const month = document.getElementById('admin-month').value;
+    if (!month) return;
+    let csv = `氏名,基本開始,基本終了,${month}労働時間,${month}残業時間\n`;
+    [...teachers].sort((a,b)=>a.id-b.id).forEach(t => {
+      let mTotal = 0, mOver = 0;
+      for (let d in dailyLogs) {
+        if (d.startsWith(month) && dailyLogs[d][t.id]) {
+          mTotal += dailyLogs[d][t.id].work || 0; mOver += dailyLogs[d][t.id].over || 0;
+        }
+      }
+      csv += `${t.name},${t.standardStart},${t.standardEnd},${mTotal.toFixed(2)},${mOver.toFixed(2)}\n`;
+    });
+    downloadFile(csv, `Summary_${month}.csv`, 'text/csv;charset=utf-8;');
+  }
+
+  // 3. CSV出力：日別詳細ログ
+  function exportDetailedCSV() {
+    const month = document.getElementById('admin-month').value;
+    if (!month) return;
+    let csv = `日付,教員ID,氏名,出勤時間,退勤時間,実働時間,残業時間\n`;
+    
+    // 日付順にソートして出力
+    Object.keys(dailyLogs).sort().forEach(date => {
+      if(date.startsWith(month)) {
+        Object.keys(dailyLogs[date]).forEach(teacherId => {
+          const t = teachers.find(x => x.id == teacherId);
+          const log = dailyLogs[date][teacherId];
+          const name = t ? t.name : "削除済ユーザー";
+          csv += `${date},${teacherId},${name},${log.in||""},${log.out||""},${log.work.toFixed(2)},${log.over.toFixed(2)}\n`;
+        });
+      }
+    });
+    downloadFile(csv, `DailyLogs_${month}.csv`, 'text/csv;charset=utf-8;');
+  }
+
+  // 4. CSV読込：教員名簿の一括更新
+  // 想定フォーマット: id,name,standardStart,standardEnd
+  function importTeachersCSV(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    if(!confirm("CSVから名簿を上書き登録しますか？\n（IDが一致する先生は情報が上書きされます）")) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const lines = e.target.result.split('\n');
+      let updatedCount = 0;
+      
+      for(let i=1; i<lines.length; i++) { // 1行目はヘッダ想定でスキップ
+        if(!lines[i].trim()) continue;
+        const [idStr, name, start, end] = lines[i].split(',');
+        const id = parseInt(idStr);
+        if(!id || !name) continue;
+
+        let existing = teachers.find(t => t.id === id);
+        if(existing) {
+          existing.name = name.trim();
+          if(start) existing.standardStart = start.trim();
+          if(end) existing.standardEnd = end.trim();
+        } else {
+          teachers.push({
+            id: id, name: name.trim(), status: "out", 
+            standardStart: start ? start.trim() : "08:15", 
+            standardEnd: end ? end.trim() : "16:45", timeIn: null
+          });
+        }
+        updatedCount++;
+      }
+      saveData();
+      renderBoard();
+      renderAdminTable();
+      alert(`${updatedCount}名の教員データを読み込みました！`);
+    };
+    reader.readAsText(file); // UTF-8想定
+    event.target.value = ""; // リセット
+  }
+
+  // 5. JSONバックアップ：全データ保存
+  function exportJSON() {
+    const backupData = {
+      exportedAt: new Date().toISOString(),
+      teachers: teachers,
+      dailyLogs: dailyLogs
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    downloadFile(jsonStr, `Attendance_Backup_${getTodayStr()}.json`, 'application/json');
+  }
+
+  // 6. JSON復元：全データ上書き
+  function importJSON(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    if(!confirm("🚨 警告 🚨\n現在のすべてのデータが消去され、選択したファイルの内容で完全に上書きされます。\n本当によろしいですか？")) {
+      event.target.value = ""; return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if(data.teachers && data.dailyLogs) {
+          teachers = data.teachers;
+          dailyLogs = data.dailyLogs;
+          saveData();
+          renderBoard();
+          renderAdminTable();
+          alert("✅ データの復元が完了しました！");
+        } else {
+          alert("❌ 正しいバックアップファイルではありません。");
+        }
+      } catch(err) {
+        alert("❌ ファイルの読み込みに失敗しました。ファイルが破損している可能性があります。");
+      }
+      event.target.value = ""; // リセット
+    };
+    reader.readAsText(file);
+  }
+
+  // 起動時
   checkDateReset();  
   renderBoard();
 </script>
