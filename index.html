@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>先生のための温かい出退勤管理</title>
+  <style>
+    :root {
+      --primary-color: #f7a072;
+      --bg-color: #fff9f5;
+      --text-main: #5a4a42;
+      --btn-off: #e0dcd9;
+      --btn-on: #88d49e;
+      --btn-done: #b8c2cc;
+      --alert-yellow: #ffcf54;
+      --alert-red: #ff7676;
+      --alert-light-red: #ffe6e6;
+    }
+    
+    body {
+      font-family: 'Hiragino Maru Gothic ProN', 'Rounded M+ 1c', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background-color: var(--primary-color);
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    h1 { margin: 0; font-size: 1.5rem; }
+    
+    .nav-btn {
+      background: white;
+      color: var(--primary-color);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 20px auto;
+      padding: 0 20px;
+    }
+
+    #board-view { display: block; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+
+    .name-tile {
+      background-color: var(--btn-off);
+      border: none;
+      border-radius: 12px;
+      padding: 20px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 0px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    .name-tile:active { transform: translateY(4px); box-shadow: none; }
+    .name-tile.status-in { background-color: var(--btn-on); color: white; }
+    .name-tile.status-done { background-color: var(--btn-done); color: white; }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 30px;
+    }
+    
+    .page-btn {
+      padding: 10px 20px;
+      border: none;
+      background-color: var(--primary-color);
+      color: white;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .page-btn:disabled { background-color: #ccc; cursor: not-allowed; }
+
+    #admin-view { display: none; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    th, td { padding: 12px; border: 1px solid #eee; text-align: center; }
+    th { background-color: #fcece3; }
+    .alert-yellow { background-color: var(--alert-yellow); }
+    .alert-red { background-color: var(--alert-red); color: white;}
+    .status-warning { background-color: var(--alert-light-red); font-weight: bold; color: #d32f2f;} 
+    
+    .admin-controls { display: flex; justify-content: space-between; margin-bottom: 15px; }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      text-align: center;
+      max-width: 400px;
+      box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+    }
+    .modal-content h2 { color: var(--primary-color); margin-top: 0; }
+    .modal-content p { font-size: 1.1rem; line-height: 1.5; }
+    .modal-btn {
+      margin-top: 20px;
+      padding: 10px 30px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🌸 学校出退勤ボード</h1>
+    <button class="nav-btn" onclick="toggleView()">管理画面へ切り替え</button>
+  </header>
+
+  <div class="container">
+    <div id="board-view">
+      <div style="text-align: center; margin-bottom: 10px;">
+        <h2 id="current-date-time"></h2>
+        <p>名前をタップして打刻してください</p>
+      </div>
+      <div class="grid" id="teacher-grid"></div>
+      <div class="pagination">
+        <button class="page-btn" id="prev-btn" onclick="changePage(-1)">前へ</button>
+        <span id="page-indicator" style="line-height: 40px; font-weight: bold;"></span>
+        <button class="page-btn" id="next-btn" onclick="changePage(1)">次へ</button>
+      </div>
+    </div>
+
+    <div id="admin-view">
+      <h2>📊 今月の集計データ（管理者用）</h2>
+      <div class="admin-controls">
+        <button class="page-btn" onclick="exportCSV()">📥 CSVダウンロード</button>
+      </div>
+      <table id="admin-table">
+        <thead>
+          <tr>
+            <th>氏名</th>
+            <th>基本勤務時間</th>
+            <th>当月総労働時間</th>
+            <th>当月残業合計</th>
+            <th>現在の状態</th>
+          </tr>
+        </thead>
+        <tbody id="admin-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal">
+    <div class="modal-content">
+      <h2 id="modal-title"></h2>
+      <p id="modal-message"></p>
+      <button class="modal-btn" onclick="closeModal()">閉じる</button>
+    </div>
+  </div>
+
+<script>
+  const ITEMS_PER_PAGE = 20;
+  let currentPage = 1;
+  let teachers = JSON.parse(localStorage.getItem('school_teachers'));
+  
+  if (!teachers) {
+    teachers = [];
+    const names = ["山田 太郎", "佐藤 花子", "鈴木 一郎", "高橋 結衣", "田中 健太", "伊藤 美咲", "渡辺 翔太", "山本 葵", "中村 蓮", "小林 凛",
+                   "加藤 大輝", "吉田 さくら", "山田 拓哉", "佐々木 結菜", "山口 陽向", "松本 莉子", "井上 蒼空", "木村 結愛", "林 奏太", "斎藤 琴音"];
+    
+    names.forEach((name, index) => {
+      teachers.push({
+        id: index + 1,
+        name: name,
+        status: "out",
+        standardStart: "08:15",
+        standardEnd: "16:45",
+        monthlyTotalHours: 0,
+        monthlyOvertime: 0,
+        timeIn: null
+      });
+    });
+    saveData();
+  }
+
+  function saveData() {
+    localStorage.setItem('school_teachers', JSON.stringify(teachers));
+  }
+
+  function checkMonthReset() {
+    const now = new Date();
+    const thisMonth = now.getFullYear() + "-" + (now.getMonth() + 1);
+    const savedMonth = localStorage.getItem('current_month');
+
+    if (savedMonth && thisMonth !== savedMonth) {
+      teachers.forEach(t => {
+        t.monthlyTotalHours = 0;
+        t.monthlyOvertime = 0;
+      });
+      saveData();
+    }
+    localStorage.setItem('current_month', thisMonth);
+  }
+
+  function checkDateReset() {
+    const today = new Date().toLocaleDateString();
+    const lastDate = localStorage.getItem('last_used_date');
+
+    if (lastDate && lastDate !== today) {
+      teachers.forEach(t => {
+        if (t.status === "in") {
+          console.warn(`⚠️ ${t.name}先生 が前日退勤打刻なし（強制リセット）`);
+        }
+        t.status = "out";
+        t.timeIn = null;
+      });
+      saveData();
+    }
+    localStorage.setItem('last_used_date', today);
+  }
+
+  function timeToMinutes(timeStr) {
+    const [h, m] = timeStr.split(":").map(Number);
+    return h * 60 + m;
+  }
+
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('current-date-time').innerText = 
+      `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  function renderBoard() {
+    const grid = document.getElementById('teacher-grid');
+    grid.innerHTML = '';
+    
+    let displayTeachers = [...teachers].sort((a, b) => {
+      if (a.status === "in" && b.status !== "in") return -1;
+      if (a.status !== "in" && b.status === "in") return 1;
+      return a.id - b.id; 
+    });
+
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    const end = start + ITEMS_PER_PAGE;
+    const pageTeachers = displayTeachers.slice(start, end);
+
+    pageTeachers.forEach(t => {
+      const btn = document.createElement('button');
+      btn.className = `name-tile status-${t.status}`;
+      
+      let statusText = "";
+      // 🟡 神機能：打刻時刻のちょい表示
+      if (t.status === "in") {
+        const time = new Date(t.timeIn);
+        const hh = time.getHours();
+        const mm = time.getMinutes().toString().padStart(2, '0');
+        statusText = `<br><small>${hh}:${mm}〜勤務中</small>`;
+      }
+      if (t.status === "done") statusText = "<br><small>退勤済</small>";
+      
+      btn.innerHTML = `${t.name} ${statusText}`;
+      btn.onclick = () => handlePunch(t.id);
+      grid.appendChild(btn);
+    });
+
+    const totalPages = Math.ceil(teachers.length / ITEMS_PER_PAGE);
+    document.getElementById('page-indicator').innerText = `${currentPage} / ${totalPages}`;
+    document.getElementById('prev-btn').disabled = currentPage === 1;
+    document.getElementById('next-btn').disabled = currentPage === totalPages;
+  }
+
+  function changePage(delta) {
+    currentPage += delta;
+    renderBoard();
+  }
+
+  function handlePunch(id) {
+    const teacher = teachers.find(t => t.id === id);
+    
+    // 🔴 現場救済：退勤取り消し機能
+    if (teacher.status === "done") {
+      if (!confirm(`${teacher.name}先生、退勤を取り消して勤務中に戻しますか？`)) return;
+      teacher.status = "in";
+      teacher.timeIn = new Date().getTime(); // 再開時刻として記録
+      saveData();
+      renderBoard();
+      if(isAdmin) renderAdminTable();
+      return;
+    }
+
+    if (teacher.status === "out") {
+      teacher.status = "in";
+      teacher.timeIn = new Date().getTime();
+      
+      showModal(`${teacher.name}先生、おはようございます！`, "今日も1日よろしくお願いします！");
+
+    } else if (teacher.status === "in") {
+      if (!confirm(`${teacher.name}先生、退勤しますか？`)) return;
+
+      teacher.status = "done";
+      const now = new Date();
+
+      // 🔴 超重要バグ修正：getTime() を使った正確な時間計算
+      const workHours = (now.getTime() - teacher.timeIn) / (1000 * 60 * 60);
+
+      const standardStart = timeToMinutes(teacher.standardStart);
+      const standardEnd = timeToMinutes(teacher.standardEnd);
+      const standardHours = (standardEnd - standardStart) / 60;
+
+      const overtime = Math.max(0, workHours - standardHours);
+
+      teacher.monthlyTotalHours += workHours;
+      teacher.monthlyOvertime += overtime;
+
+      let alertTitle = "お疲れ様でした！";
+      let alertMsg = `本日の実働は ${workHours.toFixed(2)} 時間でした。`;
+
+      if (teacher.monthlyOvertime > 45) {
+        alertTitle = "⚠️ 超過警告";
+        alertMsg += `<br><br>今月の残業が <strong style="color:red;">${teacher.monthlyOvertime.toFixed(1)} 時間</strong> です。<br>業務調整を相談してください。`;
+      } else if (teacher.monthlyOvertime > 30) {
+        alertTitle = "💡 注意";
+        alertMsg += `<br><br>今月の残業が <strong>${teacher.monthlyOvertime.toFixed(1)} 時間</strong> です。<br>明日は早く帰りましょう。`;
+      }
+
+      showModal(`${teacher.name}先生、${alertTitle}`, alertMsg);
+    }
+    
+    saveData();
+    renderBoard();
+    if(isAdmin) renderAdminTable();
+  }
+
+  function showModal(title, message) {
+    document.getElementById('modal-title').innerText = title;
+    document.getElementById('modal-message').innerHTML = message;
+    document.getElementById('modal').style.display = 'flex';
+  }
+  function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+  }
+
+  let isAdmin = false;
+  function toggleView() {
+    isAdmin = !isAdmin;
+    document.getElementById('board-view').style.display = isAdmin ? 'none' : 'block';
+    document.getElementById('admin-view').style.display = isAdmin ? 'block' : 'none';
+    document.querySelector('.nav-btn').innerText = isAdmin ? '打刻画面に戻る' : '管理画面へ切り替え';
+    if(isAdmin) renderAdminTable();
+  }
+
+  function renderAdminTable() {
+    const tbody = document.getElementById('admin-tbody');
+    tbody.innerHTML = '';
+
+    const adminTeachers = [...teachers].sort((a, b) => a.id - b.id);
+
+    adminTeachers.forEach(t => {
+      const tr = document.createElement('tr');
+      
+      let statusHtml = "<td>🟢 正常</td>";
+      let stateText = t.status === "in" ? "勤務中" : (t.status === "done" ? "退勤済" : "未出勤");
+      let stateHtml = `<td>${stateText}</td>`;
+
+      if (t.monthlyOvertime > 45) {
+        tr.className = "alert-red";
+        statusHtml = "<td>🔴 危険 (45h超過)</td>";
+      } else if (t.monthlyOvertime > 30) {
+        tr.className = "alert-yellow";
+        statusHtml = "<td>🟡 注意 (30h超過)</td>";
+      }
+
+      if (t.status === "in") {
+        tr.classList.add("status-warning");
+        stateHtml = `<td>⚠️ 未退勤</td>`;
+      }
+
+      tr.innerHTML = `
+        <td>${t.name}</td>
+        <td>${t.standardStart}〜${t.standardEnd}</td>
+        <td>${t.monthlyTotalHours.toFixed(2)} h</td>
+        <td>${t.monthlyOvertime.toFixed(2)} h</td>
+        ${stateHtml}
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function exportCSV() {
+    let csvContent = "氏名,基本勤務開始,基本勤務終了,当月総労働時間,当月残業合計\n";
+    
+    const exportTeachers = [...teachers].sort((a, b) => a.id - b.id);
+    exportTeachers.forEach(t => {
+      csvContent += `${t.name},${t.standardStart},${t.standardEnd},${t.monthlyTotalHours.toFixed(2)},${t.monthlyOvertime.toFixed(2)}\n`;
+    });
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `attendance_${new Date().getFullYear()}_${new Date().getMonth()+1}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  checkMonthReset(); 
+  checkDateReset();  
+  renderBoard();
+</script>
+</body>
+</html>
